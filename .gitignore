@@ -1,0 +1,6 @@
+logs/
+postgres/
+
+__pycache__/
+*.py[cod]
+__pypackages__/
