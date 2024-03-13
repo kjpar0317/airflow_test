@@ -6,6 +6,8 @@ __pycache__/
 __pypackages__/
 
 *.pid
+*.out
+*.err
 
 custom/dags/
 custom/logs/

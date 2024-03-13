@@ -1,4 +1,3 @@
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,117 +14,217 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-"""Default configuration for the Airflow webserver."""
-from __future__ import annotations
+"""
+   webserver_config
+   Referencies
+     - https://flask-appbuilder.readthedocs.io/en/latest/security.html#authentication-oauth
+"""
 
 import os
+import logging
+import jwt
+import requests
+import json
 
-from flask_appbuilder.const import AUTH_DB
+from dotenv import load_dotenv
+from base64 import b64decode
+from cryptography.hazmat.primitives import serialization
 
-# from airflow.www.fab_security.manager import AUTH_LDAP
-# from airflow.www.fab_security.manager import AUTH_OAUTH
-# from airflow.www.fab_security.manager import AUTH_OID
-# from airflow.www.fab_security.manager import AUTH_REMOTE_USER
+from flask import redirect, session
+from flask_appbuilder import expose
+from flask_appbuilder.security.manager import AUTH_OAUTH
+from flask_appbuilder.security.views import AuthOAuthView
 
+from airflow.www.security import AirflowSecurityManager
+from airflow.models import Variable
+
+load_dotenv()
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+log = logging.getLogger(__name__)
 
-# Flask-WTF flag for CSRF
-WTF_CSRF_ENABLED = True
-WTF_CSRF_TIME_LIMIT = None
+MY_PROVIDER = 'keycloak'
+# CLIENT_ID = 'airflow'
+# CLIENT_SECRET = 'z6cxuk9cElW4HPV7Cl8I5nUHYio1NcBN'
+# KEYCLOAK_ISSUER_URL = 'http://192.168.130.205:7001/realms/airflow'
+# KEYCLOAK_BASE_URL = 'http://192.168.130.205:7001/realms/airflow/protocol/openid-connect/'
+# KEYCLOAK_TOKEN_URL = 'http://192.168.130.205:7001/realms/airflow/protocol/openid-connect/token'
+# KEYCLOAK_AUTH_URL = 'http://192.168.130.205:7001/realms/airflow/protocol/openid-connect/auth'
+# KEYCLOAK_JWKS_URL = 'http://192.168.130.205:7001/realms/airflow/protocol/openid-connect/certs'
 
-# ----------------------------------------------------
-# AUTHENTICATION CONFIG
-# ----------------------------------------------------
-# For details on how to set up each of the following authentication, see
-# http://flask-appbuilder.readthedocs.io/en/latest/security.html# authentication-methods
-# for details.
+AUTH_TYPE = AUTH_OAUTH
+AUTH_USER_REGISTRATION = True
+AUTH_USER_REGISTRATION_ROLE = "Public"
+AUTH_ROLES_SYNC_AT_LOGIN = True
+PERMANENT_SESSION_LIFETIME = 1800
 
-# The authentication type
-# AUTH_OID : Is for OpenID
-# AUTH_DB : Is for database
-# AUTH_LDAP : Is for LDAP
-# AUTH_REMOTE_USER : Is for using REMOTE_USER from web server
-# AUTH_OAUTH : Is for OAuth
-AUTH_TYPE = AUTH_DB
+AUTH_ROLES_MAPPING = {
+  "airflow_admin": ["Admin"],
+  "airflow_op": ["Op"],
+  "airflow_user": ["User"],
+  "airflow_viewer": ["Viewer"],
+  "airflow_public": ["Public"],
+}
 
-# Uncomment to setup Full admin role name
-# AUTH_ROLE_ADMIN = 'Admin'
+OAUTH_PROVIDERS = [
+  {
+   'name': 'keycloak',
+   'icon': 'fa-circle-o',
+   'token_key': 'access_token', 
+   'remote_app': {
+     'client_id': os.getenv("KEYCLOAK_CLIENT_ID"),
+     'client_secret': os.getenv("KEYCLOAK_CLIENT_SECRET"),
+     'client_kwargs': {
+       'scope': 'email profile'
+     },
+     'api_base_url': os.getenv("KEYCLOAK_BASE_URL"),
+     'request_token_url': None,
+     'access_token_url': os.getenv("KEYCLOAK_TOKEN_URL"),
+     'authorize_url': os.getenv("KEYCLOAK_AUTH_URL"),
+     'jwks_uri': os.getenv("KEYCLOAK_JWKS_URL"),
+    },
+  },
+]
 
-# Uncomment and set to desired role to enable access without authentication
-# AUTH_ROLE_PUBLIC = 'Viewer'
+Variable.set("oauth_list", json.dumps(OAUTH_PROVIDERS, indent=2))
+Variable.set("keycloak_cron_expression", os.getenv("KEYCLOAK_TOKEN_CRON"))
 
-# Will allow user self registration
-# AUTH_USER_REGISTRATION = True
+req = requests.get(os.getenv("KEYCLOAK_ISSUER_URL"))
+key_der_base64_json = req.json()
+key_der_base64 = key_der_base64_json['public_key']
+key_der = b64decode(key_der_base64.encode())
+public_key = serialization.load_der_public_key(key_der)
 
-# The recaptcha it's automatically enabled for user self registration is active and the keys are necessary
-# RECAPTCHA_PRIVATE_KEY = PRIVATE_KEY
-# RECAPTCHA_PUBLIC_KEY = PUBLIC_KEY
+class CustomAuthRemoteUserView(AuthOAuthView):
+  @expose("/logout/")
+  def logout(self):
+    """Delete access token before logging out."""
+    return super().logout()
 
-# Config for Flask-Mail necessary for user self registration
-# MAIL_SERVER = 'smtp.gmail.com'
-# MAIL_USE_TLS = True
-# MAIL_USERNAME = 'yourappemail@gmail.com'
-# MAIL_PASSWORD = 'passwordformail'
-# MAIL_DEFAULT_SENDER = 'sender@gmail.com'
+class CustomSecurityManager(AirflowSecurityManager):
+  authoauthview = CustomAuthRemoteUserView
 
-# The default user self registration role
-# AUTH_USER_REGISTRATION_ROLE = "Public"
+  def oauth_user_info(self, provider, response):
+    if provider == MY_PROVIDER:
+      token = response["access_token"]
 
-# When using OAuth Auth, uncomment to setup provider(s) info
-# Google OAuth example:
-# OAUTH_PROVIDERS = [{
-#   'name':'google',
-#     'token_key':'access_token',
-#     'icon':'fa-google',
-#         'remote_app': {
-#             'api_base_url':'https://www.googleapis.com/oauth2/v2/',
-#             'client_kwargs':{
-#                 'scope': 'email profile'
-#             },
-#             'access_token_url':'https://accounts.google.com/o/oauth2/token',
-#             'authorize_url':'https://accounts.google.com/o/oauth2/auth',
-#             'request_token_url': None,
-#             'client_id': GOOGLE_KEY,
-#             'client_secret': GOOGLE_SECRET_KEY,
-#         }
-# }]
+      # 미리 넣어둔다
+      Variable.set("keycloak_access_info", token) 
+      Variable.set("keycloak_public_key", f"-----BEGIN PUBLIC KEY-----\n{key_der_base64}\n-----END PUBLIC KEY-----")
+      # Variable.set("keycloak_public_key_encode", public_key)
 
-# When using LDAP Auth, setup the ldap server
-# AUTH_LDAP_SERVER = "ldap://ldapserver.new"
+      log.info(key_der_base64)
 
-# When using OpenID Auth, uncomment to setup OpenID providers.
-# example for OpenID authentication
-# OPENID_PROVIDERS = [
-#    { 'name': 'Yahoo', 'url': 'https://me.yahoo.com' },
-#    { 'name': 'AOL', 'url': 'http://openid.aol.com/<username>' },
-#    { 'name': 'Flickr', 'url': 'http://www.flickr.com/<username>' },
-#    { 'name': 'MyOpenID', 'url': 'https://www.myopenid.com' }]
+      me = jwt.decode(token, public_key, algorithms=['RS256'], audience="account")
 
-# ----------------------------------------------------
-# Theme CONFIG
-# ----------------------------------------------------
-# Flask App Builder comes up with a number of predefined themes
-# that you can use for Apache Airflow.
-# http://flask-appbuilder.readthedocs.io/en/latest/customizing.html#changing-themes
-# Please make sure to remove "navbar_color" configuration from airflow.cfg
-# in order to fully utilize the theme. (or use that property in conjunction with theme)
-# APP_THEME = "bootstrap-theme.css"  # default bootstrap
-# APP_THEME = "amelia.css"
-# APP_THEME = "cerulean.css"
-# APP_THEME = "cosmo.css"
-# APP_THEME = "cyborg.css"
-# APP_THEME = "darkly.css"
-# APP_THEME = "flatly.css"
-# APP_THEME = "journal.css"
-# APP_THEME = "lumen.css"
-# APP_THEME = "paper.css"
-# APP_THEME = "readable.css"
-# APP_THEME = "sandstone.css"
-# APP_THEME = "simplex.css"
-# APP_THEME = "slate.css"
-# APP_THEME = "solar.css"
-# APP_THEME = "spacelab.css"
-# APP_THEME = "superhero.css"
-# APP_THEME = "united.css"
-# APP_THEME = "yeti.css"
+      log.info(me)
+      
+      # sample of resource_access
+      # {
+      #   "resource_access": { "airflow": { "roles": ["airflow_admin"] }}
+      # }
+      # groups = me["resource_access"]["account"]["roles"] # unsafe
+
+      # log.info("groups: {0}".format(groups))
+
+      # if len(groups) < 1:
+      #   groups = ["airflow_public"]
+      # else:
+      #   groups = [str for str in groups if "airflow" in str]
+
+      userinfo = {
+        "username": me.get("preferred_username"),
+        "email": me.get("email"),
+        "first_name": me.get("given_name"),
+        "last_name": me.get("family_name"),
+        "role_keys": AUTH_ROLES_MAPPING.get(me.get("preferred_username")),
+      }
+      log.info("user info: {0}".format(userinfo))
+      return userinfo
+    else:
+       return {}
+
+
+  def auth_user_oauth(self, userinfo):
+    """
+        Method for authenticating user with OAuth.
+        :userinfo: dict with user information
+                    (keys are the same as User model columns)
+    """
+    # extract the username from `userinfo`
+    if "username" in userinfo:
+      username = userinfo["username"]
+    elif "email" in userinfo:
+      username = userinfo["email"]
+    else:
+      log.error(
+          "OAUTH userinfo does not have username or email {0}".format(userinfo)
+      )
+      return None
+
+    # If username is empty, go away
+    if (username is None) or username == "":
+      return None
+    
+    # Search the DB for this user
+    user = self.find_user(username=username)
+
+    # If user is not active, go away
+    if user and (not user.is_active):
+      return None
+
+    # If user is not registered, and not self-registration, go away
+    if (not user) and (not self.auth_user_registration):
+      return None
+
+    # Sync the user's roles
+    if user and self.auth_roles_sync_at_login:
+      user_role_objects = set()
+      user_role_objects.add(self.find_role(AUTH_USER_REGISTRATION_ROLE))
+      
+      for item in userinfo.get("role_keys", []):
+        fab_role = self.find_role(item)
+        if fab_role:
+          user_role_objects.add(fab_role)
+        user.roles = list(user_role_objects)
+
+      log.debug(
+          "Calculated new roles for user='{0}' as: {1}".format(
+              username, user.roles
+          )
+      )
+
+    # If the user is new, register them
+    if (not user) and self.auth_user_registration:
+      user_role_objects = set()
+      user_role_objects.add(self.find_role(AUTH_USER_REGISTRATION_ROLE))
+
+      for item in userinfo.get("role_keys", []):
+        fab_role = self.find_role(item)
+        if fab_role:
+          user_role_objects.add(fab_role)
+      
+      user = self.add_user(
+        username=username,
+        first_name=userinfo.get("first_name", ""),
+        last_name=userinfo.get("last_name", ""),
+        email=userinfo.get("email", "") or f"{username}@email.notfound",
+        role=list(user_role_objects),
+      )
+      log.debug("New user registered: {0}".format(user))
+
+      # If user registration failed, go away
+      if not user:
+        log.error("Error creating a new OAuth user {0}".format(username))
+        return None
+
+    # LOGIN SUCCESS (only if user is now registered)
+    if user:
+      self.update_user_auth_stat(user)
+      return user
+    else:
+      return None
+
+SECURITY_MANAGER_CLASS = CustomSecurityManager
+
+APP_THEME = "simplex.css"
