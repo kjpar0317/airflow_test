@@ -2,6 +2,7 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.contrib.sensors.redis_key_sensor import RedisKeySensor
+from airflow.utils.trigger_rule import TriggerRule
 
 import redis
 import pendulum
@@ -47,6 +48,7 @@ redis_key_sensor_task = RedisKeySensor(
 # Task 3: 끝
 end_task = DummyOperator(
     task_id='end_task',
+    trigger_rule=TriggerRule.ALL_DONE,
     dag=dag,
 )
 
