@@ -47,7 +47,7 @@ x-airflow-common:
   # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
   # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
   image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.5.1}
-  # build: .
+  build: . # build 명령어는 주석처리 된 것을 푼다.
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
@@ -55,15 +55,23 @@ x-airflow-common:
     # For backward compatibility, with Airflow <2.3
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
-    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CELERY__BROKER_URL: redis://:qwe1212!Q@redis:6379/0
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
-    AIRFLOW__WEBSERVER__X_FRAME_ENABLED: 'False'
-    AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'False'
-    AIRFLOW__CORE__ENABLE_XCOM_PICKLING: 'True'
-    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false' # airflow 예제 보여주는 옵션
+    AIRFLOW__WEBSERVER__X_FRAME_ENABLED: 'false'
+    AIRFLOW__WEBSERVER__WARN_DEPLOYMENT_EXPOSURE: 'false'
+    AIRFLOW__CORE__ENABLE_XCOM_PICKLING: 'true' # pickle형태 지원여부
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true' # airflow configuration 보여줌
+    # AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
     # AIRFLOW__API__AUTH_BACKENDS: 'user_auth'
+    AIRFLOW__API__ACCESS_CONTROL_ALLOW_HEADERS: 'origin,content-type,accept'
+    AIRFLOW__API__ACCESS_CONTROL_ALLOW_METHODS: 'POST,GET,OPTIONS,DELETE'
+    AIRFLOW__API__ACCESS_CONTROL_ALLOW_ORIGINS: '*'
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: 'system'
+    AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'system'
+
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     ENV_TEST: ${ENV_TEST}
     KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
@@ -106,8 +114,11 @@ services:
 
   redis:
     image: redis:latest
+    command: redis-server --requirepass qwe1212!Q --port 6379
     expose:
       - 6379
+    ports:
+      - 6380:6379 # 6380로 redis 열어둠
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

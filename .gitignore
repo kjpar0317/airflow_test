@@ -4,3 +4,9 @@ postgres/
 __pycache__/
 *.py[cod]
 __pypackages__/
+
+*.pid
+
+custom/dags/
+custom/logs/
+custom/plugins/

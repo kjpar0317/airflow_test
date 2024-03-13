@@ -1,0 +1,15 @@
+[[34m2024-03-11T04:58:30.540+0000[0m] {[34mcommand.py:[0m168} INFO[0m - Visit me at http://0.0.0.0:5555[0m
+[[34m2024-03-11T04:58:30.569+0000[0m] {[34mcommand.py:[0m176} INFO[0m - Broker: redis://redis:6379/0[0m
+[[34m2024-03-11T04:58:30.572+0000[0m] {[34mcommand.py:[0m177} INFO[0m - Registered tasks: 
+['airflow.providers.celery.executors.celery_executor_utils.execute_command',
+ 'celery.accumulate',
+ 'celery.backend_cleanup',
+ 'celery.chain',
+ 'celery.chord',
+ 'celery.chord_unlock',
+ 'celery.chunks',
+ 'celery.group',
+ 'celery.map',
+ 'celery.starmap'][0m
+[[34m2024-03-11T04:58:30.577+0000[0m] {[34mmixins.py:[0m228} INFO[0m - Connected to redis://redis:6379/0[0m
+[[34m2024-03-11T05:01:12.910+0000[0m] {[34mevents.py:[0m191} ERROR[0m - Failed to capture events: 'Connection closed by server.', trying again in 1 seconds.[0m
