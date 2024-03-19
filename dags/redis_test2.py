@@ -4,6 +4,7 @@ from airflow import DAG
 from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator
 from celery import Celery
+from airflow.providers.redis.hooks.redis import RedisHook
 
 import redis
 import logging
@@ -18,7 +19,7 @@ kst = pendulum.timezone("Asia/Seoul")
 app = Celery('redis_test2', broker='redis://localhost:6379/0')
 
 # Redis 클라이언트 설정
-redis_client = redis.StrictRedis(host='redis', port=6379, db=0, password='qwe1212!Q')
+# redis_client = redis.StrictRedis(host='redis', port=6379, db=0, password='qwe1212!Q')
 
 # DAG 설정
 default_args = {
@@ -45,8 +46,13 @@ start_task = DummyOperator(
 # Task 2: Python 함수 실행
 def my_python_function():
     # Redis에 메시지 보내기
-    redis_client.set('test2', 'Hello from my Python function!')
-    log.info(redis_client.get('test'))
+    # redis_client.set('test2', 'Hello from my Python function!')
+    # log.info(redis_client.get('test'))
+    redis_hook = RedisHook(redis_conn_id="redis_default")
+    rdb = redis_hook.get_conn()
+
+    rdb.set('test2', 'Hello from my Python function!')
+    log.info(rdb.get('test'))
 
 python_task = PythonOperator(
     task_id='python_task',

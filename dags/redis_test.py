@@ -3,6 +3,7 @@ from airflow.operators.dummy_operator import DummyOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.contrib.sensors.redis_key_sensor import RedisKeySensor
 from airflow.utils.trigger_rule import TriggerRule
+from airflow.providers.redis.hooks.redis import RedisHook
 
 import redis
 import pendulum
@@ -53,18 +54,24 @@ end_task = DummyOperator(
 )
 
 # Redis 연결 정보
-redis_host = 'redis'
-redis_port = 6379
-redis_db = 0
-redis_passwd = 'qwe1212!Q'
+# redis_host = 'redis'
+# redis_port = 6379
+# redis_db = 0
+# redis_passwd = 'qwe1212!Q'
 
 def extract_redis_value(**kwargs):
     # Redis 연결
-    r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, password= redis_passwd)
-    
+    # r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, password= redis_passwd)
+
     # 특정 키의 값을 가져옴
+    # key = 'test'
+    # value = r.get(key)
+
+    redis_hook = RedisHook(redis_conn_id="redis_default")
+    rdb = redis_hook.get_conn()
+
     key = 'test'
-    value = r.get(key)
+    value = rdb.get(key)
     
     # 로그에 값 출력
     log.info(f"Value for key '{key}': {value}")
