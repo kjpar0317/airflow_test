@@ -85,4 +85,4 @@ extract_value_task = PythonOperator(
 )
 
 # Task 실행 순서 설정
-start_task >> [redis_key_sensor_task >> extract_value_task] >> end_task
+start_task >> redis_key_sensor_task >> extract_value_task >> end_task
